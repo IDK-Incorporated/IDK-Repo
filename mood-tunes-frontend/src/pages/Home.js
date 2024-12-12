@@ -1,20 +1,21 @@
-// src/pages/Home.jsx
-
 import React, { useState, useEffect } from "react";
 import Header from "../components/Header";
 import { db, auth } from "../firebaseConfig";
 import { doc, getDoc, collection, addDoc } from "firebase/firestore";
-import { fetchSpotifyToken, fetchSpotifyTracks } from "../api/spotifyApi";
+import { fetchSpotifyTracks } from "../api/spotifyApi";
 
 const Home = () => {
     const [mood, setMood] = useState("");
     const [playlist, setPlaylist] = useState([]);
-    const [playlistName, setPlaylistName] = useState(""); // Initial playlist name
-    const [customPlaylistName, setCustomPlaylistName] = useState(""); // User-defined playlist name
+    const [playlistName, setPlaylistName] = useState("");
+    const [customPlaylistName, setCustomPlaylistName] = useState("");
     const [savedMessage, setSavedMessage] = useState("");
     const [errorMessage, setErrorMessage] = useState("");
     const [name, setUserName] = useState("");
-    const [isUserNameLoaded, setIsUserNameLoaded] = useState(false); // New state to track if userName is loaded
+    const [isUserNameLoaded, setIsUserNameLoaded] = useState(false);
+    const [isGenerating, setIsGenerating] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+    const [hoveredButton, setHoveredButton] = useState(false);
 
     useEffect(() => {
         const fetchUserName = async () => {
@@ -25,44 +26,31 @@ const Home = () => {
                     const userDocSnap = await getDoc(userDocRef);
                     if (userDocSnap.exists()) {
                         const userData = userDocSnap.data();
-                        console.log("Fetched Firestore Data:", userData); // Log Firestore data
-                        if (userData.name) {
-                            const fullName = userData.name;
-                            console.log("Full Name from Firestore:", fullName); // Log full name
-                            const firstName = fullName.split(" ")[0]; // Extract the first name
-                            console.log("Extracted First Name:", firstName); // Log first name
-                            setUserName(firstName); // Set the first name
-                        } else {
-                            console.error("Name field is missing in Firestore");
-                            setUserName(null); // Fallback to null
-                        }
+                        const fullName = userData.name || "User";
+                        setUserName(fullName.split(" ")[0]); // Extract first name
                     } else {
-                        console.error("User document not found in Firestore");
-                        setUserName(null); // Fallback to null
+                        setUserName("User");
                     }
                 } catch (error) {
                     console.error("Error fetching user data from Firestore:", error);
-                    setUserName(null); // Fallback to null
+                    setUserName("User");
                 }
             } else {
-                console.error("No user is currently logged in");
-                setUserName(null); // Fallback to null
+                setUserName("User");
             }
-            setIsUserNameLoaded(true); // Set to true after attempting to fetch
+            setIsUserNameLoaded(true);
         };
 
         fetchUserName();
     }, []);
 
-
-
     const styles = {
         container: {
-            marginTop: "100px", // Adjusted to match header height
+            marginTop: "100px",
             padding: "20px",
             textAlign: "center",
             backgroundColor: "#f5f7fa",
-            minHeight: "calc(100vh - 100px)", // Adjusted to match header height
+            minHeight: "calc(100vh - 100px)",
             boxSizing: "border-box",
         },
         title: {
@@ -126,7 +114,7 @@ const Home = () => {
         },
         playlist: {
             display: "grid",
-            gridTemplateColumns: "repeat(4, 1fr)", // Set to 4 columns
+            gridTemplateColumns: "repeat(4, 1fr)",
             gap: "20px",
             justifyContent: "center",
         },
@@ -154,37 +142,10 @@ const Home = () => {
             fontSize: "16px",
             color: "#333",
         },
-        albumName: {
-            fontStyle: "italic",
-            color: "#777",
-            marginBottom: "5px",
-            fontSize: "14px",
-        },
         artistName: {
             color: "#555",
             marginBottom: "10px",
             fontSize: "14px",
-        },
-        playlistLink: {
-            color: "#4CAF50",
-            textDecoration: "none",
-            fontWeight: "bold",
-            marginBottom: "10px",
-            fontSize: "14px",
-        },
-        deleteButton: {
-            backgroundColor: "#e74c3c",
-            color: "#fff",
-            border: "none",
-            padding: "5px 10px",
-            fontSize: "14px",
-            borderRadius: "5px",
-            cursor: "pointer",
-            marginTop: "10px",
-            transition: "background-color 0.3s",
-        },
-        deleteButtonHover: {
-            backgroundColor: "#c0392b",
         },
         saveButtonContainer: {
             marginTop: "30px",
@@ -200,20 +161,7 @@ const Home = () => {
             cursor: "pointer",
             transition: "background-color 0.3s",
         },
-        saveButtonDisabled: {
-            backgroundColor: "#a0c3ff",
-            cursor: "not-allowed",
-        },
-        audioPlayer: {
-            width: "100%",
-            marginTop: "10px",
-        },
     };
-
-    const [isGenerating, setIsGenerating] = useState(false);
-    const [isSaving, setIsSaving] = useState(false);
-    const [hoveredDeleteButtonId, setHoveredDeleteButtonId] = useState(null);
-    const [hoveredButton, setHoveredButton] = useState(false);
 
     const handleGeneratePlaylist = async () => {
         if (!mood) {
@@ -222,40 +170,28 @@ const Home = () => {
         }
 
         try {
-            setErrorMessage(""); // Clear previous errors
+            setErrorMessage("");
             setIsGenerating(true);
-            const token = await fetchSpotifyToken(); // Fetch Spotify access token
-            if (token) {
-                const tracks = await fetchSpotifyTracks(mood, token, 16); // Fetch 16 tracks based on mood
-                if (tracks.length === 16) {
-                    setPlaylist(tracks); // Directly set the playlist
-                    setCustomPlaylistName(""); // Reset custom playlist name
+            const tracks = await fetchSpotifyTracks(mood, process.env.REACT_APP_OPENAI_API_KEY);
+            console.log("Tracks fetched:", tracks);
 
-                    // Handle possessive form correctly
-                    const nameToUse = name || "User";
-                    const possessiveName = nameToUse.endsWith('s')
-                        ? `${nameToUse}'` // If name ends with 's', just add an apostrophe
-                        : `${nameToUse}'s`; // Else, add 's
-                    setPlaylistName(
-                        `${possessiveName} ${mood.charAt(0).toUpperCase() + mood.slice(1)} Vibes`
-                    );
-                } else {
-                    setErrorMessage("Could not generate 16 tracks. Try again.");
-                }
+            if (Array.isArray(tracks) && tracks.length > 0) {
+                setPlaylist(tracks);
+                const nameToUse = name || "User";
+                const possessiveName = nameToUse.endsWith("s")
+                    ? `${nameToUse}'`
+                    : `${nameToUse}'s`;
+                setPlaylistName(`${possessiveName} ${mood.charAt(0).toUpperCase() + mood.slice(1)} Vibes`);
             } else {
-                setErrorMessage(
-                    "Failed to fetch Spotify token. Check your API credentials."
-                );
+                setErrorMessage("No valid tracks were generated. Please try again.");
             }
         } catch (error) {
             console.error("Error generating playlist:", error);
-            setErrorMessage("Something went wrong while fetching the playlist.");
+            setErrorMessage("Something went wrong while generating the playlist.");
         } finally {
             setIsGenerating(false);
         }
     };
-
-
 
     const savePlaylist = async () => {
         if (playlist.length === 0) {
@@ -289,9 +225,7 @@ const Home = () => {
     };
 
     const handleDeleteSong = (songId) => {
-        setPlaylist((prevPlaylist) =>
-            prevPlaylist.filter((song) => song.id !== songId)
-        );
+        setPlaylist((prevPlaylist) => prevPlaylist.filter((song) => song.id !== songId));
     };
 
     return (
@@ -326,7 +260,7 @@ const Home = () => {
                             : {}),
                         ...(hoveredButton ? styles.buttonHover : {}),
                     }}
-                    disabled={isGenerating || !isUserNameLoaded} // Disable button until userName is loaded
+                    disabled={isGenerating || !isUserNameLoaded}
                     onMouseEnter={() => setHoveredButton(true)}
                     onMouseLeave={() => setHoveredButton(false)}
                 >
@@ -359,34 +293,19 @@ const Home = () => {
                                         style={styles.albumCover}
                                     />
                                     <span style={styles.trackName}>{song.name}</span>
-                                    <span style={styles.albumName}>Album: {song.album}</span>
                                     <span style={styles.artistName}>Artist: {song.artist}</span>
-                                    <a
-                                        href={song.url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        style={styles.playlistLink}
-                                    >
-                                        Listen on Spotify
-                                    </a>
-                                    {song.previewUrl ? (
-                                        <audio controls style={styles.audioPlayer}>
-                                            <source src={song.previewUrl} type="audio/mpeg" />
-                                            Your browser does not support the audio element.
-                                        </audio>
-                                    ) : (
-                                        <p>Preview not available</p>
-                                    )}
                                     <button
                                         onClick={() => handleDeleteSong(song.id)}
                                         style={{
-                                            ...styles.deleteButton,
-                                            ...(hoveredDeleteButtonId === song.id
-                                                ? styles.deleteButtonHover
-                                                : {}),
+                                            backgroundColor: "#e74c3c",
+                                            color: "#fff",
+                                            border: "none",
+                                            padding: "5px 10px",
+                                            fontSize: "14px",
+                                            borderRadius: "5px",
+                                            cursor: "pointer",
+                                            transition: "background-color 0.3s",
                                         }}
-                                        onMouseEnter={() => setHoveredDeleteButtonId(song.id)}
-                                        onMouseLeave={() => setHoveredDeleteButtonId(null)}
                                     >
                                         Delete
                                     </button>
@@ -398,7 +317,7 @@ const Home = () => {
                                 onClick={savePlaylist}
                                 style={{
                                     ...styles.saveButton,
-                                    ...(isSaving ? styles.saveButtonDisabled : {}),
+                                    ...(isSaving ? { backgroundColor: "#a0c3ff", cursor: "not-allowed" } : {}),
                                 }}
                                 disabled={isSaving || playlist.length === 0}
                             >

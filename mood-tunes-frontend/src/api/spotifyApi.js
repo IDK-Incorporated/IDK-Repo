@@ -1,35 +1,6 @@
 import axios from "axios";
 
-export const fetchSpotifyToken = async () => {
-    try {
-        console.log("Requesting Spotify token...");
-        const clientId = process.env.REACT_APP_SPOTIFY_CLIENT_ID;
-        const clientSecret = process.env.REACT_APP_SPOTIFY_CLIENT_SECRET;
-
-        // Log credentials to ensure they are loaded correctly (remove in production)
-        console.log("Client ID:", clientId);
-        console.log("Client Secret:", clientSecret);
-
-        const response = await axios.post(
-            "https://accounts.spotify.com/api/token",
-            "grant_type=client_credentials", // Body as a string
-            {
-                headers: {
-                    "Content-Type": "application/x-www-form-urlencoded",
-                    Authorization: `Basic ${btoa(`${clientId}:${clientSecret}`)}`, // Base64 encode credentials
-                },
-            }
-        );
-        console.log("Spotify token fetched successfully:", response.data.access_token);
-        return response.data.access_token; // Return the token
-    } catch (error) {
-        console.error("Error fetching Spotify token:", error.response?.data || error.message);
-        return null;
-    }
-};
-
-export const fetchSpotifyTracks = async (mood, token) => {
-    // Comprehensive mood-to-genre mapping
+export const fetchSpotifyTracks = async (mood, apiKey) => {
     const moodToGenreMap = {
         happy: "pop,indie_pop,feel_good",
         sad: "acoustic,piano,singer_songwriter",
@@ -49,32 +20,78 @@ export const fetchSpotifyTracks = async (mood, token) => {
         experimental: "experimental,avant_garde,psychedelic",
     };
 
-    // Use the predefined genres or fall back to pop
     const genre = moodToGenreMap[mood.toLowerCase()] || "pop";
 
     try {
-        const response = await axios.get("https://api.spotify.com/v1/recommendations", {
-            headers: {
-                Authorization: `Bearer ${token}`,
+        const prompt = `Generate a list of 16 songs for the mood "${mood}" using genres like ${genre}. Use the following format exactly:
+
+1. "Song Title" Artist: Artist Name Album: Album Name
+2. "Song Title" Artist: Artist Name Album: Album Name
+... and so on, up to 16 songs.`;
+
+        const response = await axios.post(
+            "https://api.openai.com/v1/chat/completions",
+            {
+                model: "gpt-3.5-turbo",
+                messages: [
+                    { role: "system", content: "You are a music recommender bot." },
+                    { role: "user", content: prompt },
+                ],
+                max_tokens: 500,
             },
-            params: {
-                seed_genres: genre, // Multiple genres supported, separated by commas
-                limit: 16, // Fetch more tracks for better variety
-            },
+            {
+                headers: {
+                    Authorization: `Bearer ${apiKey}`,
+                    "Content-Type": "application/json",
+                },
+            }
+        );
+
+        const rawText = response.data.choices[0].message.content;
+        console.log("Raw response:", rawText);
+
+        // Split by lines and filter out empty lines
+        const lines = rawText.split("\n").map(line => line.trim()).filter(line => line);
+
+        const tracks = [];
+        lines.forEach((line, index) => {
+            // Expected format:
+            // 1. "Song Title" Artist: Artist Name Album: Album Name
+            // We'll split by 'Artist:' and 'Album:' to isolate parts
+            const numberMatch = line.match(/^(\d+)\.\s*"([^"]+)"/);
+            if (!numberMatch) return; // If line doesn't start with number and quoted song name, skip
+
+            const songName = numberMatch[2];
+
+            // Remove the leading number and song name part to handle the rest
+            const remainder = line.replace(numberMatch[0], "").trim();
+
+            // remainder now should start with something like: Artist: Artist Name Album: Album Name
+            const artistSplit = remainder.split("Artist:");
+            if (artistSplit.length < 2) return;
+
+            const afterArtist = artistSplit[1].trim();
+
+            const albumSplit = afterArtist.split("Album:");
+            if (albumSplit.length < 2) return;
+
+            const artistName = albumSplit[0].trim();
+            const albumName = albumSplit[1].trim();
+
+            tracks.push({
+                id: `track-${index}`,
+                name: songName,
+                artist: artistName,
+                album: albumName,
+                albumCover: "https://via.placeholder.com/200",
+                url: "#",
+            });
         });
 
-        // Format the returned tracks
-        return response.data.tracks.map((track) => ({
-            id: track.id,
-            name: track.name || "Unknown Title",
-            album: track.album?.name || "Unknown Album",
-            artist: track.artists?.[0]?.name || "Unknown Artist",
-            albumCover: track.album?.images?.[0]?.url || "https://via.placeholder.com/200", // Properly map album cover
-            url: track.external_urls?.spotify || "#",
-            previewUrl: track.preview_url || null, // Include preview URL
-        }));
+        console.log("Parsed tracks:", tracks);
+        return tracks;
     } catch (error) {
-        console.error("Error fetching Spotify tracks:", error.response?.data || error.message);
+        console.error("Error fetching tracks from OpenAI:", error);
         return [];
     }
 };
