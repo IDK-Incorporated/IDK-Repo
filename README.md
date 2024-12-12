@@ -43,19 +43,19 @@
 #### Required Must-have Stories
 
 - [x] User can register and log in to the app.
-- [ ] User can select their current mood from a predefined list.
-- [ ] User receives a list of playlists or songs matching their selected mood.
-- [ ] User can view details of a recommended playlist or song.
-- [ ] User can save favorite moods for quick access.
-- [ ] Settings screen allowing user to adjust preferences.
+- [x] User can select their current mood from a predefined list.
+- [x] User receives a list of playlists or songs matching their selected mood.
+- [x] User can view details of a recommended playlist or song.
+- [x] User can save favorite moods for quick access.
+- [x] Settings screen allowing user to adjust preferences.
 
 #### Optional Nice-to-have Stories
 
-- [ ] User can listen to song previews within the app.
-- [ ] User can share their mood and recommended playlists with friends.
-- [ ] User can customize and add new moods.
-- [ ] Integration with multiple music streaming services.
-- [ ] User can view history of past moods and recommendations.
+- [] User can listen to song previews within the app.
+- [X] User can share their mood and recommended playlists with friends.
+- [] User can customize and add new moods.
+- [] Integration with multiple music streaming services.
+- [] User can view history of past moods and recommendations.
 
 ### 2. Screen Archetypes
 
@@ -300,7 +300,7 @@
 
 **Final Touches:**
 - Optimize playlist performance and fix any delays in Spotify playback.
-- Add error handling for network issues (e.g., failed Spotify login).
+- Add error handling for network issues (ex. failed Spotify login).
 
 **Deployment:**
 - Prepare the project for deployment.
